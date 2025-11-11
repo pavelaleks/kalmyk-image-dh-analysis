@@ -7,8 +7,6 @@ from __future__ import annotations
 import datetime as dt
 import logging
 from pathlib import Path
-from typing import Dict
-
 import pandas as pd
 
 
@@ -21,6 +19,21 @@ def _render_table(df: pd.DataFrame, max_rows: int = 30) -> str:
         return "<p>No data available.</p>"
     limited = df.head(max_rows)
     return limited.to_html(index=False, escape=False, classes="table table-sm")
+
+
+def add_summary_block(df: pd.DataFrame) -> str:
+    sem = df["semantic_label"].value_counts().to_dict()
+    att = df["attitude"].value_counts().to_dict()
+    total = len(df)
+    html_block = f"""
+    <h2>Statistical Summary</h2>
+    <ul>
+        <li><strong>Total contexts:</strong> {total}</li>
+        <li><strong>Semantic label distribution:</strong> {sem}</li>
+        <li><strong>Attitude distribution:</strong> {att}</li>
+    </ul>
+    """
+    return html_block
 
 
 def generate_report(contexts: pd.DataFrame, output_path: Path | str = REPORT_PATH) -> None:
@@ -52,6 +65,15 @@ def generate_report(contexts: pd.DataFrame, output_path: Path | str = REPORT_PAT
         ]
     ].copy() if not contexts.empty else pd.DataFrame()
 
+    for col in ["semantic_label_ru", "attitude_ru", "summary_ru"]:
+        if col in summary_table.columns:
+            summary_table[col] = (
+                summary_table[col]
+                .fillna("")
+                .astype(str)
+                .str.replace(r"\n+", "<br>", regex=True)
+            )
+
     contexts_table = contexts[
         [
             "author",
@@ -62,6 +84,8 @@ def generate_report(contexts: pd.DataFrame, output_path: Path | str = REPORT_PAT
             "attitude",
         ]
     ].copy() if not contexts.empty else pd.DataFrame()
+
+    df_display = summary_table
 
     timestamp = dt.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
@@ -95,10 +119,23 @@ def generate_report(contexts: pd.DataFrame, output_path: Path | str = REPORT_PAT
         <li>Unique authors: <strong>{unique_authors}</strong></li>
         <li>Temporal coverage: <strong>{time_span[0] or 'N/A'} – {time_span[1] or 'N/A'}</strong></li>
     </ul>
-
+"""
+    html += """
     <h2>DeepSeek Semantic Overview</h2>
-    {_render_table(summary_table)}
+    <div style="max-height:600px; overflow:auto; border:1px solid #ccc; padding:0.5rem;">
+"""
+    if not df_display.empty:
+        html += df_display.to_html(
+            classes="dataframe table table-sm",
+            index=False,
+            escape=False,
+            justify="left",
+        )
+    else:
+        html += "<p>No data available.</p>"
+    html += "</div>"
 
+    html += f"""
     <h2>Sample Contexts</h2>
     {_render_table(contexts_table, max_rows=15)}
 
@@ -114,7 +151,11 @@ def generate_report(contexts: pd.DataFrame, output_path: Path | str = REPORT_PAT
         <img class="figure" src="figures/semantic_distribution.png" alt="Semantic distribution">
         <img class="figure" src="figures/sentiment_by_author.png" alt="Sentiment by author">
     </div>
+"""
 
+    html += add_summary_block(contexts)
+
+    html += """
     <p>All artefacts are reproducible via the pipeline defined in <code>main.py</code>.</p>
 </body>
 </html>

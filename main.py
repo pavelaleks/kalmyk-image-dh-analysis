@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -26,6 +27,17 @@ logging.basicConfig(
 LOGGER = logging.getLogger("kalmyk-analysis")
 
 
+def clean_contexts(df):
+    df["context"] = df["context"].str.replace(r"\s+", " ", regex=True).str.strip()
+    df["word_count"] = df["context"].apply(lambda x: len(x.split()))
+    filtered = df[df["word_count"] >= 20].copy()
+    print(
+        f"🧹 Filtered contexts: {len(filtered)} of {len(df)} "
+        f"(removed {len(df) - len(filtered)})"
+    )
+    return filtered
+
+
 def main() -> None:
     tqdm.pandas()
 
@@ -43,6 +55,11 @@ def main() -> None:
         LOGGER.warning("No contexts identified. Exiting.")
         return
     LOGGER.info("Extracted %d contexts.", len(contexts))
+
+    contexts = clean_contexts(contexts)
+    if contexts.empty:
+        LOGGER.warning("No contexts remain after filtering. Exiting.")
+        return
 
     # DeepSeek-анализ
     tqdm.pandas(desc="Classifying contexts")
@@ -72,13 +89,19 @@ def main() -> None:
     contexts.to_csv(output_path, index=False)
     LOGGER.info("Updated enriched contexts at %s", output_path)
 
-    print("\n[SUMMARY]")
-    print("Semantic categories:", contexts["semantic_label"].value_counts().to_dict())
-    print("Sentiment distribution:", contexts["attitude"].value_counts().to_dict())
-    print(f"Contexts total: {len(contexts)}")
+    stats = {
+        "total_contexts": len(contexts),
+        "semantic_label_counts": contexts["semantic_label"].value_counts().to_dict(),
+        "attitude_counts": contexts["attitude"].value_counts().to_dict(),
+        "authors": contexts["author"].nunique(),
+    }
+    summary_path = Path("output") / "summary.json"
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    with summary_path.open("w", encoding="utf-8") as f:
+        json.dump(stats, f, ensure_ascii=False, indent=2)
+    print("📊 Saved summary to output/summary.json")
     print("✅ Saved full bilingual contexts to output/contexts_full.csv")
 
 
 if __name__ == "__main__":
     main()
-
