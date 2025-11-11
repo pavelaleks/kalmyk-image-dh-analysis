@@ -176,6 +176,21 @@ def interpret_table(title: str, sample: str) -> str:
     return _cached_request("interpret-table", f"{title}:{sample}", prompt)
 
 
+def interpret_cached(title: str, description_hint: str, sample_text: str = "") -> str:
+    cache_payload = f"{title}|{description_hint}|{sample_text[:800]}"
+    prompt = (
+        "You are an academic analyst working on a Digital Humanities project "
+        "about representations of Kalmyks in 19th–20th century English travelogues.\n\n"
+        f"Task: Provide a concise scholarly interpretation (5–6 sentences) of the visualization titled '{title}'.\n"
+        "Explain what trends or cultural implications the data show, how they should be read, "
+        "and what they reveal about British views of the Kalmyks or Siberia.\n"
+        "Respond in Russian, adopting a formal academic tone that could appear in a research article.\n\n"
+        f"Contextual description: {description_hint}\n\n"
+        f"Sample data preview:\n{sample_text[:800]}"
+    )
+    return _cached_request("interpret-visual", cache_payload, prompt)
+
+
 def request_commentary(prompt: str, task: str = "commentary") -> str:
     return _cached_request(task, prompt, prompt)
 
@@ -187,5 +202,6 @@ __all__ = [
     "translate_to_russian",
     "interpret_table",
     "request_commentary",
+    "interpret_cached",
 ]
 

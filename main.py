@@ -132,7 +132,7 @@ def main() -> None:
         f.write(json.dumps(contexts["attitude"].value_counts().to_dict(), indent=2))
         f.write("\n\nInterpretive notes:\n")
         commentary = request_commentary(
-            "Summarize the general tendencies of the Kalmyk representations across all travelogues."
+            "Сформулируй краткое (5–6 предложений) научное резюме общих тенденций представления калмыков во всех травелогах. Пиши по-русски, придерживаясь академического стиля."
         )
         f.write(commentary)
     print("🧾 Saved detailed summary to output/summary.txt")
