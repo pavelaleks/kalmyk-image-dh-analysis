@@ -7,18 +7,16 @@ from __future__ import annotations
 import datetime as dt
 import logging
 from pathlib import Path
+
 import pandas as pd
+
+from src.deepseek_module import interpret_table
 
 
 LOGGER = logging.getLogger(__name__)
 REPORT_PATH = Path("output") / "report.html"
 
-
-def _render_table(df: pd.DataFrame, max_rows: int = 30) -> str:
-    if df.empty:
-        return "<p>No data available.</p>"
-    limited = df.head(max_rows)
-    return limited.to_html(index=False, escape=False, classes="table table-sm")
+pd.set_option("display.max_colwidth", 100)
 
 
 def add_summary_block(df: pd.DataFrame) -> str:
@@ -36,6 +34,31 @@ def add_summary_block(df: pd.DataFrame) -> str:
     return html_block
 
 
+def shorten_text(text: str, limit: int = 200) -> str:
+    if isinstance(text, str) and len(text) > limit:
+        return text[:limit] + "..."
+    return text
+
+
+def render_table(df: pd.DataFrame, title: str) -> str:
+    if df.empty:
+        table_html = "<p>No data available.</p>"
+    else:
+        table_html = df.to_html(
+            classes="table table-striped table-sm",
+            index=False,
+            escape=False,
+            justify="left",
+            col_space=120,
+        )
+    return f"""
+    <h3>{title}</h3>
+    <div style="max-height:500px; overflow:auto; border:1px solid #ccc; padding:0.5rem; margin-bottom:1rem;">
+        {table_html}
+    </div>
+    """
+
+
 def generate_report(contexts: pd.DataFrame, output_path: Path | str = REPORT_PATH) -> None:
     """
     Produce an HTML dashboard linking together the analysis artefacts.
@@ -50,20 +73,24 @@ def generate_report(contexts: pd.DataFrame, output_path: Path | str = REPORT_PAT
         int(contexts["year"].max()) if pd.notnull(contexts["year"].max()) else None,
     )
 
-    summary_table = contexts[
-        [
-            "author",
-            "year",
-            "title",
-            "ethnonym",
-            "semantic_label",
-            "semantic_label_ru",
-            "attitude",
-            "attitude_ru",
-            "summary_en",
-            "summary_ru",
-        ]
-    ].copy() if not contexts.empty else pd.DataFrame()
+    summary_table = (
+        contexts[
+            [
+                "author",
+                "year",
+                "title",
+                "ethnonym",
+                "semantic_label",
+                "semantic_label_ru",
+                "attitude",
+                "attitude_ru",
+                "summary_en",
+                "summary_ru",
+            ]
+        ].copy()
+        if not contexts.empty
+        else pd.DataFrame()
+    )
 
     for col in ["semantic_label_ru", "attitude_ru", "summary_ru"]:
         if col in summary_table.columns:
@@ -72,18 +99,23 @@ def generate_report(contexts: pd.DataFrame, output_path: Path | str = REPORT_PAT
                 .fillna("")
                 .astype(str)
                 .str.replace(r"\n+", "<br>", regex=True)
+                .apply(shorten_text)
             )
 
-    contexts_table = contexts[
-        [
-            "author",
-            "year",
-            "ethnonym",
-            "context",
-            "semantic_label",
-            "attitude",
-        ]
-    ].copy() if not contexts.empty else pd.DataFrame()
+    contexts_table = (
+        contexts[
+            [
+                "author",
+                "year",
+                "ethnonym",
+                "context",
+                "semantic_label",
+                "attitude",
+            ]
+        ].copy()
+        if not contexts.empty
+        else pd.DataFrame()
+    )
 
     df_display = summary_table
 
@@ -100,12 +132,6 @@ def generate_report(contexts: pd.DataFrame, output_path: Path | str = REPORT_PAT
         h1, h2, h3 {{ margin-top: 2rem; }}
         img.figure {{ max-width: 100%; height: auto; margin-bottom: 1.5rem; }}
         .table-sm td, .table-sm th {{ padding: 0.35rem; }}
-        .context-block {{
-            background:#f7f7f7;
-            border-radius:6px;
-            padding:1rem;
-            margin-bottom:1rem;
-        }}
     </style>
 </head>
 <body>
@@ -120,25 +146,11 @@ def generate_report(contexts: pd.DataFrame, output_path: Path | str = REPORT_PAT
         <li>Temporal coverage: <strong>{time_span[0] or 'N/A'} – {time_span[1] or 'N/A'}</strong></li>
     </ul>
 """
+
+    html += render_table(df_display, "DeepSeek Semantic Overview")
+    html += render_table(contexts_table.head(50), "Sample Contexts (Top 50)")
+
     html += """
-    <h2>DeepSeek Semantic Overview</h2>
-    <div style="max-height:600px; overflow:auto; border:1px solid #ccc; padding:0.5rem;">
-"""
-    if not df_display.empty:
-        html += df_display.to_html(
-            classes="dataframe table table-sm",
-            index=False,
-            escape=False,
-            justify="left",
-        )
-    else:
-        html += "<p>No data available.</p>"
-    html += "</div>"
-
-    html += f"""
-    <h2>Sample Contexts</h2>
-    {_render_table(contexts_table, max_rows=15)}
-
     <h2>Visualisations</h2>
     <div>
         <img class="figure" src="figures/mentions_by_year.png" alt="Mentions by year">
@@ -154,6 +166,14 @@ def generate_report(contexts: pd.DataFrame, output_path: Path | str = REPORT_PAT
 """
 
     html += add_summary_block(contexts)
+
+    if not df_display.empty:
+        sample = df_display.head(10).to_string()
+        interpretation = interpret_table("DeepSeek Semantic Overview", sample)
+        html += f"""
+    <h2>Interpretive Commentary</h2>
+    <p>{interpretation}</p>
+"""
 
     html += """
     <p>All artefacts are reproducible via the pipeline defined in <code>main.py</code>.</p>

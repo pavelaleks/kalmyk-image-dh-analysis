@@ -153,18 +153,20 @@ def plot_semantic_distribution(df: pd.DataFrame, output_path: Path) -> None:
     if "semantic_label" not in df.columns:
         LOGGER.warning("semantic_label column missing; skipping semantic distribution.")
         return
-    counts = df["semantic_label"].value_counts().sort_values(ascending=False)
+    counts = df["semantic_label"].value_counts()
     if counts.empty:
         LOGGER.warning("semantic_label column empty; skipping semantic distribution.")
         return
-    fig, ax = plt.subplots(figsize=(8, 5))
-    counts.plot(kind="bar", color="steelblue", ax=ax)
-    ax.set_title("Distribution of Kalmyk Image Types")
-    ax.set_xlabel("Semantic label")
-    ax.set_ylabel("Count")
+    counts = counts.head(10)
+    plt.figure(figsize=(8, 5))
+    counts.plot(kind="bar", color="steelblue")
+    plt.title("Distribution of Kalmyk Image Types (Top 10)")
+    plt.xlabel("Semantic label")
+    plt.ylabel("Count")
     plt.xticks(rotation=45, ha="right")
     plt.tight_layout()
-    _save_figure(fig, output_path)
+    plt.savefig(output_path, dpi=200)
+    plt.close()
 
 
 def plot_sentiment_by_author(df: pd.DataFrame, output_path: Path) -> None:

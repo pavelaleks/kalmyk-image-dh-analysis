@@ -9,6 +9,8 @@ from tqdm.auto import tqdm
 from src.deepseek_module import (
     classify_context,
     detect_sentiment,
+    interpret_table,
+    request_commentary,
     summarize_context,
     translate_to_russian,
 )
@@ -36,6 +38,22 @@ def clean_contexts(df):
         f"(removed {len(df) - len(filtered)})"
     )
     return filtered
+
+
+def normalize_label(text: str) -> str:
+    if not isinstance(text, str):
+        return "unknown"
+    text_lower = text.lower()
+    for cat in ["ethnographic", "functional", "evaluative", "religious", "imperial"]:
+        if cat in text_lower:
+            return cat
+    return "other"
+
+
+def normalize_attitude(text: str) -> str:
+    if not isinstance(text, str):
+        return "unknown"
+    return text.strip().split()[0].lower()
 
 
 def main() -> None:
@@ -79,6 +97,9 @@ def main() -> None:
         translate_to_russian
     )
 
+    contexts["semantic_label"] = contexts["semantic_label"].apply(normalize_label)
+    contexts["attitude"] = contexts["attitude"].apply(normalize_attitude)
+
     contexts = analyze_contexts(contexts)
     make_piro_table(contexts)
     create_visuals(contexts)
@@ -100,6 +121,21 @@ def main() -> None:
     with summary_path.open("w", encoding="utf-8") as f:
         json.dump(stats, f, ensure_ascii=False, indent=2)
     print("📊 Saved summary to output/summary.json")
+
+    summary_txt_path = Path("output") / "summary.txt"
+    with summary_txt_path.open("w", encoding="utf-8") as f:
+        f.write("=== Summary of Kalmyk Image Analysis ===\n")
+        f.write(f"Total contexts: {len(contexts)}\n")
+        f.write("Semantic label distribution:\n")
+        f.write(json.dumps(contexts["semantic_label"].value_counts().to_dict(), indent=2))
+        f.write("\n\nAttitude distribution:\n")
+        f.write(json.dumps(contexts["attitude"].value_counts().to_dict(), indent=2))
+        f.write("\n\nInterpretive notes:\n")
+        commentary = request_commentary(
+            "Summarize the general tendencies of the Kalmyk representations across all travelogues."
+        )
+        f.write(commentary)
+    print("🧾 Saved detailed summary to output/summary.txt")
     print("✅ Saved full bilingual contexts to output/contexts_full.csv")
 
 

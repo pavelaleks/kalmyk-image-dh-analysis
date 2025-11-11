@@ -165,10 +165,27 @@ def translate_to_russian(text: str) -> str:
     return _cached_request("translate", text, prompt)
 
 
+def interpret_table(title: str, sample: str) -> str:
+    prompt = (
+        f"Summarize the key trends in the table '{title}' "
+        "in 4–5 sentences, using a scholarly and analytical tone. "
+        "Do not restate the data. Identify what the results mean in cultural, historical, "
+        "or linguistic terms. Write concisely, as for an academic report. "
+        f"Table preview:\n{sample}"
+    )
+    return _cached_request("interpret-table", f"{title}:{sample}", prompt)
+
+
+def request_commentary(prompt: str, task: str = "commentary") -> str:
+    return _cached_request(task, prompt, prompt)
+
+
 __all__ = [
     "classify_context",
     "detect_sentiment",
     "summarize_context",
     "translate_to_russian",
+    "interpret_table",
+    "request_commentary",
 ]
 
