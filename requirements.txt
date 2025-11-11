@@ -1,0 +1,13 @@
+pandas
+numpy
+regex
+nltk
+spacy
+tqdm
+matplotlib
+seaborn
+wordcloud
+networkx
+openpyxl
+requests
+

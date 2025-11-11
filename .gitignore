@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+output/
+.env
+*.log
+.DS_Store
+*.pyc
+.idea/
+.ipynb_checkpoints/
+.turbo/
+*.bak
+
